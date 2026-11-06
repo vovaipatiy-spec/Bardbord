@@ -1,0 +1,408 @@
+openapi: 3.0.3
+
+info:
+  title: Guitar Store API
+  version: 1.0.0
+  description: |
+    REST API гитарного магазина.
+
+    **Авторизация:** получите JWT через `POST /api/auth/login` (или
+    `POST /api/auth/register`), затем передавайте его в заголовке:
+
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    Все запросы к `/api/products/**` и `/api/users/**` требуют токен.
+  contact:
+    name: Guitar Store
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер
+
+tags:
+  - name: Auth
+    description: Регистрация и вход
+  - name: Products
+    description: Каталог товаров
+  - name: Users
+    description: Профиль пользователя
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Регистрация пользователя
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: customer@example.com
+              password: secret123
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Пользователь с таким email уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход пользователя
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: customer@example.com
+              password: secret123
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/products:
+    get:
+      tags: [Products]
+      summary: Список товаров
+      description: Возвращает весь каталог товаров.
+      operationId: getProducts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Каталог товаров
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Идентификатор товара
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    patch:
+      tags: [Products]
+      summary: Частичное обновление товара
+      description: |
+        Обновляются только переданные поля. Если поле не передано или
+        равно `null`, оно остаётся без изменений.
+
+        Чтобы очистить `description`, передайте пустую строку `""`.
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPatchRequest'
+            examples:
+              priceOnly:
+                summary: Изменить только цену
+                value:
+                  price: 89990
+              multipleFields:
+                summary: Изменить несколько полей
+                value:
+                  name: Fender Player II Stratocaster
+                  description: Электрогитара, ольха, кленовый гриф
+                  price: 94990
+                  stock: 6
+                  categoryId: 1
+              clearDescription:
+                summary: Очистить описание
+                value:
+                  description: ""
+      responses:
+        '200':
+          description: Товар обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: |
+            Ошибка валидации или несуществующая категория:
+            `price <= 0`, `stock < 0`, пустое/слишком длинное имя,
+            неверный тип поля, `categoryId` не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Товар не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Товар с таким названием уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Неподдерживаемый Content-Type (нужен application/json)
+
+    delete:
+      tags: [Products]
+      summary: Удаление товара
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Товар удалён (тело ответа пустое)
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Товар не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Текущий пользователь
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Данные текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Ошибка валидации запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Forbidden:
+      description: Токен отсутствует или недействителен
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: secret123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+        password:
+          type: string
+          format: password
+          example: secret123
+
+    AuthResponse:
+      type: object
+      required: [token, tokenType, userId, email, role]
+      properties:
+        token:
+          type: string
+          description: JWT для заголовка Authorization
+          example: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJjdXN0b21lckBleGFtcGxlLmNvbSJ9.signature
+        tokenType:
+          type: string
+          example: Bearer
+        userId:
+          type: integer
+          format: int64
+          example: 2
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+        role:
+          type: string
+          enum: [USER, ADMIN]
+          example: USER
+
+    UserResponse:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 2
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+        role:
+          type: string
+          enum: [USER, ADMIN]
+          example: USER
+
+    ProductResponse:
+      type: object
+      required: [id, name, description, price, stock, categoryId, categoryName, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          maxLength: 150
+          example: Fender Player II Stratocaster
+        description:
+          type: string
+          nullable: true
+          example: Электрогитара, ольха, кленовый гриф, датчики Player Series
+        price:
+          type: number
+          description: Цена в рублях
+          example: 94990
+        stock:
+          type: integer
+          minimum: 0
+          example: 5
+        categoryId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+        categoryName:
+          type: string
+          nullable: true
+          example: Электрогитары
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-11-06T16:51:30"
+
+    ProductPatchRequest:
+      type: object
+      description: |
+        Все поля необязательны. Непереданное или `null` поле не изменяется.
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          description: Новое название (не может быть пустым)
+          example: Fender Player II Stratocaster
+        description:
+          type: string
+          nullable: true
+          description: Новое описание; пустая строка очищает описание
+          example: Электрогитара, ольха, кленовый гриф
+        price:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: Новая цена в рублях, должна быть больше 0
+          example: 94990
+        stock:
+          type: integer
+          minimum: 0
+          description: Новое количество на складе
+          example: 6
+        categoryId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Идентификатор существующей категории
+          example: 1
+
+    ProblemDetail:
+      type: object
+      description: Стандартный ответ об ошибке Spring Boot (RFC 7807)
+      properties:
+        type:
+          type: string
+          example: about:blank
+        title:
+          type: string
+          example: Bad Request
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: must be greater than 0
+        instance:
+          type: string
+          example: /api/products/1
