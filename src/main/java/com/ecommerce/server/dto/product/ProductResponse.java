@@ -1,5 +1,6 @@
 package com.ecommerce.server.dto.product;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -12,4 +13,6 @@ public record ProductResponse(
         Long categoryId,
         String categoryName,
         LocalDateTime createdAt
-) {}
+) implements Serializable {
+    private static final long serialVersionUID = 1L;
+}

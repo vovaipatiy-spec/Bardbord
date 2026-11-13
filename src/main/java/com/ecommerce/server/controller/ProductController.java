@@ -2,6 +2,7 @@ package com.ecommerce.server.controller;
 
 import com.ecommerce.server.dto.product.ProductPatchRequest;
 import com.ecommerce.server.dto.product.ProductResponse;
+import com.ecommerce.server.dto.product.ProductSearchRequest;
 import com.ecommerce.server.service.ProductService;
 
 import jakarta.validation.Valid;
@@ -9,8 +10,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -30,6 +33,20 @@ public class ProductController {
     @GetMapping
     public List<ProductResponse> getProducts() {
         return productService.findAll();
+    }
+
+    @GetMapping("/search")
+    public List<ProductResponse> searchProducts(
+            @Valid @ModelAttribute ProductSearchRequest request
+    ) {
+        return productService.search(request);
+    }
+
+    @PostMapping("/search")
+    public List<ProductResponse> searchProductsByBody(
+            @Valid @RequestBody ProductSearchRequest request
+    ) {
+        return productService.search(request);
     }
 
     @PatchMapping("/{id}")

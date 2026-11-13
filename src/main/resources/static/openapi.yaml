@@ -112,6 +112,149 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/products/search:
+    get:
+      tags: [Products]
+      summary: Поиск товаров
+      description: |
+        Возвращает товары, подходящие под условия поиска.
+        Все параметры необязательны: без них возвращается весь каталог.
+        Результаты кешируются в Redis на 1 минуту.
+      operationId: searchProducts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Подстрока для поиска по названию и описанию (без учёта регистра)
+          schema:
+            type: string
+            maxLength: 150
+        - name: categoryId
+          in: query
+          required: false
+          description: Идентификатор категории
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: minPrice
+          in: query
+          required: false
+          description: Минимальная цена
+          schema:
+            type: number
+            minimum: 0
+        - name: maxPrice
+          in: query
+          required: false
+          description: Максимальная цена
+          schema:
+            type: number
+            minimum: 0
+        - name: minStock
+          in: query
+          required: false
+          description: Минимальное количество на складе
+          schema:
+            type: integer
+            minimum: 0
+        - name: maxStock
+          in: query
+          required: false
+          description: Максимальное количество на складе
+          schema:
+            type: integer
+            minimum: 0
+        - name: sortBy
+          in: query
+          required: false
+          description: Поле сортировки
+          schema:
+            type: string
+            enum: [id, name, price, stock, createdAt]
+            default: id
+        - name: sortDirection
+          in: query
+          required: false
+          description: Направление сортировки
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Найденные товары
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: |
+            Ошибка валидации: `minPrice > maxPrice`, `minStock > maxStock`
+            или неверный тип параметра
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Products]
+      summary: Поиск товаров через тело запроса
+      description: |
+        То же, что и `GET /api/products/search`, но условия передаются
+        в теле запроса JSON. Удобно для сложных фильтров.
+        Результаты кешируются в Redis на 1 минуту.
+      operationId: searchProductsByBody
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductSearchRequest'
+            examples:
+              byName:
+                summary: Поиск по названию
+                value:
+                  query: stratocaster
+              byCategoryAndPrice:
+                summary: Категория и диапазон цен
+                value:
+                  categoryId: 1
+                  minPrice: 50000
+                  maxPrice: 100000
+              byPriceDesc:
+                summary: Сортировка по цене по убыванию
+                value:
+                  sortBy: price
+                  sortDirection: DESC
+      responses:
+        '200':
+          description: Найденные товары
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: |
+            Ошибка валидации: `minPrice > maxPrice`, `minStock > maxStock`
+            или неверное значение поля
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/products/{id}:
     parameters:
       - name: id
@@ -353,6 +496,56 @@ components:
           type: string
           format: date-time
           example: "2026-11-06T16:51:30"
+
+    ProductSearchRequest:
+      type: object
+      description: |
+        Все поля необязательны. Непереданные или `null` поля не участвуют
+        в фильтрации.
+      properties:
+        query:
+          type: string
+          maxLength: 150
+          description: Подстрока для поиска по названию и описанию (без учёта регистра)
+          example: stratocaster
+        categoryId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Идентификатор категории
+          example: 1
+        minPrice:
+          type: number
+          minimum: 0
+          description: Минимальная цена
+          example: 50000
+        maxPrice:
+          type: number
+          minimum: 0
+          description: Максимальная цена
+          example: 100000
+        minStock:
+          type: integer
+          minimum: 0
+          description: Минимальное количество на складе
+          example: 1
+        maxStock:
+          type: integer
+          minimum: 0
+          description: Максимальное количество на складе
+          example: 10
+        sortBy:
+          type: string
+          enum: [id, name, price, stock, createdAt]
+          default: id
+          description: Поле сортировки
+          example: price
+        sortDirection:
+          type: string
+          enum: [ASC, DESC]
+          default: ASC
+          description: Направление сортировки
+          example: DESC
 
     ProductPatchRequest:
       type: object
